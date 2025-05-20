@@ -107,7 +107,6 @@ def process_rawdata(filepath, signalcol, timecol, iso_flag, gcamp_flag, session_
     #dff = butter(2, 4, btype='low', fs=fps)
     #dff = filtfilt(b,a, dff)
 
-    dff = filtfilt(np.divide(np.ones((5)), 5), 1, dff)
     dff = gaussian_filter1d(dff, sigma = gaussian_sigma)
 
     gcamp_df["gcamp dff"] = dff
