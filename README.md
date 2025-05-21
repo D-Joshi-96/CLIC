@@ -1,5 +1,5 @@
 # CLIC
-Programmes and scripts deployed during the research projects conducted in the <ins>C</ins>ambridge <ins>L</ins>aboratory for Rearch on <ins>I</ins>mpulsive/<ins>C</ins>ompulsive disorders (CLIC).
+Programmes and scripts deployed during the research projects conducted in the <ins>C</ins>ambridge <ins>L</ins>aboratory for Rearch on <ins>I</ins>mpulsive/<ins>C</ins>ompulsive Disorders (CLIC).
 
 ### CLIC Photo
 
