@@ -222,46 +222,80 @@ def peaky_finder(input_df, spike_threshold, signal = "gcamp"):
 def find_closest_index(df_column, value):
     return (df_column - value).abs().idxmin()
 
-def gen_psth(fp_df, event_file_path, event_timecol, events_recorded, event_to_snip, snip_window, baseline_zscore = False, baseline_window = None):
+def gen_psth(fp_df, event_file_path, event_timecol, events_recorded, snip_window, baseline_zscore = False, baseline_window = None):
 
     """Takes the dataframe from the master dataframe created from the process_rawdata() function and snips the deltaF/F around an event from interest specified from the csv file with timestamps of behavioural events."""
 
     fp_df = fp_df.copy().reset_index(drop = True)
     
-    event_counter = 0
-    event, snip_t, gcamp_zscore = [], [], []
+    event_counter = 1
+    event_name, event_no, snip_time, snip_zscore = [], [], [], []
     
-    fps = round(np.mean(1/np.diff(fp_df["iso time"])))
+    fps = round(np.mean(1/np.diff(fp_df["iso time"]))) #calculating the sampling rate of the photometry experiment
 
     event_df = pd.read_csv(event_file_path)
     event_df["time"] = event_df[event_timecol] - event_df[event_timecol].min()
+    del event_df[event_timecol]
 
     for event_type in events_recorded:
         event_df[event_type + " on"] = (event_df[event_type] & ~event_df[event_type].shift(1, fill_value = False)).astype(int)
-    
-    for i in event_df[event_df[event_to_snip + " on"]==1]["time"].values.tolist():
-        
-        if i in fp_df["gcamp time"].values:
-            index = fp_df[fp_df["gcamp time"] == i].index[0]
-        else:
-            index = find_closest_index(fp_df["gcamp time"], i)
-        gcamp_signal = fp_df.iloc[index-(snip_window[0]*fps):index+(snip_window[1]*fps)+1]["gcamp dff"].values.tolist()
-        
-        for j in gcamp_signal:
-            if baseline_zscore == True and baseline_window != None:
-                snip_baseline = fp_df.iloc[index-(baseline_window[0]*fps):index+(baseline_window[1]*fps)+1]["gcamp dff"].values.tolist()
-                gcamp_zscore.append((0.6745*(j - np.median(snip_baseline)))/mad(snip_baseline))
 
-            else:
-                gcamp_zscore.append((0.6745*(j - np.median(gcamp_signal)))/mad(gcamp_signal))
-            event.append(event_counter+1)
+        for i in event_df[event_df[event_type + " on"]==1]["time"].values.tolist():
             
-        for l in [round(x, 2) for x in np.arange(-snip_window[0], snip_window[1] + (1/fps), 1/fps)]:
-            snip_t.append(l)
+            if i in fp_df["gcamp time"].values:
+                index = fp_df[fp_df["gcamp time"] == i].index[0]
+            else:
+                index = find_closest_index(fp_df["gcamp time"], i)
+            
+            gcamp_signal = fp_df.iloc[index-(snip_window[0]*fps):index+(snip_window[1]*fps)+1]["gcamp dff"].values.tolist()
+            
+            for j in gcamp_signal:
+                if baseline_zscore == True and baseline_window != None:
+                    snip_baseline = fp_df.iloc[index-(baseline_window[0]*fps):index+(baseline_window[1]*fps)+1]["gcamp dff"].values.tolist()
+                    snip_zscore.append((0.6745*(j - np.median(snip_baseline)))/mad(snip_baseline))
 
-        event_counter = event_counter + 1
+                else:
+                    snip_zscore.append((0.6745*(j - np.median(gcamp_signal)))/mad(gcamp_signal))
+                
+                event_name.append(event_type)
+                event_no.append(event_counter)
+                
+            for l in [round(x, 2) for x in np.arange(-snip_window[0], snip_window[1] + (1/fps), 1/fps)]:
+                snip_time.append(l)
+
+            event_counter = event_counter + 1
         
-    snip_df = pd.DataFrame([event, snip_t, gcamp_zscore]).T
-    snip_df.columns = ["event_no", "time", "gcamp zscore"]
+    snip_df = pd.DataFrame([event_name, event_no, snip_time, snip_zscore]).T
+    snip_df.columns = ["event", "event no", "time", "gcamp zscore"]
 
     return event_df, snip_df
+
+def mark_spikes(master_df):
+    for i in master_df[master_df["spike"]==1]["gcamp time"]:
+        plt.axvline(i, color = "red", linestyle = ":")
+
+def highlight_waves(master_df):
+    for i,j in zip(master_df["wave start"].dropna().unique(), master_df["wave end"].dropna().unique()):
+        mask = (master_df['gcamp time'] >= i) & (master_df['gcamp time'] <= j)
+        plt.fill_between(master_df.loc[mask, 'gcamp time'], master_df.loc[mask, 'gcamp zscore'], alpha=0.6, color='red')
+
+def mark_events(event_df, event_name):
+    for i in event_df[event_df[event_name + " on"]==1]["time"]:
+        plt.axvline(i, color = "blue", linestyle = ":")
+
+def psth_plots(events, snip_df):
+    n = len(events)
+
+    if n == 1:
+        axs = [axs]
+
+    fig, axs = plt.subplots(1, n, figsize=(6 * n, 10))  
+
+    for i, event in enumerate(events):
+        sns.lineplot(data = snip_df[snip_df["event"]==event], x = "time", y = "gcamp zscore", ax = axs[i])
+        axs[i].axvline(0, color = "k", linestyle = ":")
+        axs[i].axhline(0, color = "k", linestyle = ":")
+        axs[i].set_ylabel("GCaMP z-score", fontsize = 20)
+        axs[i].set_xlabel("time", fontsize = 20)
+        axs[i].set_title(event, fontsize = 20)
+        sns.despine()
