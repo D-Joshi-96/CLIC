@@ -222,7 +222,7 @@ def peaky_finder(input_df, spike_threshold, signal = "gcamp"):
 def find_closest_index(df_column, value):
     return (df_column - value).abs().idxmin()
 
-def gen_psth(fp_df, event_file_path, event_col, event_timecol, snip_window, baseline_zscore = False, baseline_window = None):
+def gen_psth(fp_df, event_file_path, event_timecol, events_recorded, event_to_snip, snip_window, baseline_zscore = False, baseline_window = None):
 
     """Takes the dataframe from the master dataframe created from the process_rawdata() function and snips the deltaF/F around an event from interest specified from the csv file with timestamps of behavioural events."""
 
@@ -235,9 +235,11 @@ def gen_psth(fp_df, event_file_path, event_col, event_timecol, snip_window, base
 
     event_df = pd.read_csv(event_file_path)
     event_df["time"] = event_df[event_timecol] - event_df[event_timecol].min()
-    event_df[event_col + " on"] = (event_df[event_col] & ~event_df[event_col].shift(1, fill_value = False)).astype(int)
+
+    for event_type in events_recorded:
+        event_df[event_type + " on"] = (event_df[event_type] & ~event_df[event_type].shift(1, fill_value = False)).astype(int)
     
-    for i in event_df[event_df[event_col + " on"]==1]["time"].values.tolist():
+    for i in event_df[event_df[event_to_snip + " on"]==1]["time"].values.tolist():
         
         if i in fp_df["gcamp time"].values:
             index = fp_df[fp_df["gcamp time"] == i].index[0]
@@ -262,4 +264,4 @@ def gen_psth(fp_df, event_file_path, event_col, event_timecol, snip_window, base
     snip_df = pd.DataFrame([event, snip_t, gcamp_zscore]).T
     snip_df.columns = ["event_no", "time", "gcamp zscore"]
 
-    return snip_df
+    return event_df, snip_df
